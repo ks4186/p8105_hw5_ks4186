@@ -1,0 +1,13 @@
+---
+title: "P8105 HW5"
+author: "Kehan Su"
+date: "2024-11-15"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(readr)
+```
