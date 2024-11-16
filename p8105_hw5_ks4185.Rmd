@@ -80,15 +80,80 @@ ggplot(exp_df_summary, aes(x = mu, y = power)) +
   geom_line() +
   geom_point() +
   labs(x = "True value of μ", y = "Power", title = "Power of the Test by Effect Size") +
-  geom_hline(yintercept = 0.05, linetype = "dashed")
+  geom_hline(yintercept = 0.05, linetype = "dashed", color = "red")
+```
+The plot shows a positive association between effect size (true value of mu) and the power of the test.
 
+```{r}
 # Plot 2: Average Estimate of μ vs True Value of μ
-ggplot(exp_df_summary, aes(x = mu, y = mean_estimate_all)) +
-  geom_line() +
-  geom_point() +
+ggplot(exp_df_summary, aes(x = mu)) +
+  geom_line(aes(y = mean_estimate_all, color = "All Data")) +
+  geom_point(aes(y = mean_estimate_all, color = "All Data")) +
+  geom_line(aes(y = mean_estimate_reject, color = "Rejected Data")) +
+  geom_point(aes(y = mean_estimate_reject, color = "Rejected Data")) +
+  scale_color_manual(name = "Data Type", values = c("All Data" = "blue", "Rejected Data" = "red")) +
   labs(x = "True value of μ", y = "Average Estimate of μ", title = "Average Estimate of μ by True Value of μ") +
-  geom_line(aes(y = mean_estimate_reject)) +
-  geom_point(aes(y = mean_estimate_reject))
+  theme_minimal() +
+  theme(legend.position = "right")
+```
+The sample average of 𝜇̂ across tests for which the null is rejecte dis not approximately equal to the true value of 𝜇. It is because of selection bias. When filtering only for tests where the null hypothesis was rejected, we tend to get samples where random variation pushed the sample mean further from zero, which increases the likelihood of rejecting the null.
+
+
+## Problem 3
+
+```{r}
+url = "https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv"
+homicide_data = read_csv(url)
+```
+```{r}
+# Summarize the data
+summarized_data = homicide_data |>
+    mutate(city_state = paste(city, state, sep = ","),
+    unsolved = ifelse(disposition %in% c("Closed without arrest", "Open/No arrest"), 1, 0)
+    ) |>
+  filter(!(city_state == "Tulsa,AL")) |>
+  group_by(city_state) |>
+  summarize(
+    total_homicides = n(),
+    unsolved_homicides = sum(unsolved)
+  )
 ```
 
+```{r}
+# Test for Baltimore
+baltimore_data =
+  summarized_data |>
+  filter(city_state == "Baltimore,MD")
 
+baltimore_prop_test = baltimore_data |>
+  with(prop.test(unsolved_homicides, total_homicides))
+
+baltimore_summary = 
+  broom::tidy(baltimore_prop_test) |>
+  select(estimate, conf.low, conf.high)
+
+baltimore_summary
+```
+```{r}
+# Test for all cities
+city_results = summarized_data |>
+  mutate(
+    test_result = purrr::map2(unsolved_homicides, total_homicides, ~ prop.test(.x, .y) |> broom::tidy())
+  ) |>
+  unnest(test_result) |>
+  select(city_state, estimate, conf.low, conf.high)
+city_results
+```
+```{r}
+city_results |>
+  mutate(city_state = fct_reorder(city_state, estimate)) |>
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
+  coord_flip() +
+  labs(
+    title = "Proportion of Unsolved Homicides by City",
+    x = "City",
+    y = "Proportion of Unsolved Homicides"
+  )
+```
